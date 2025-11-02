@@ -3,8 +3,8 @@
 
 
 # Create a requirements.txt file
-echo "yt-dlp" >> requirements.txt
-echo "python-telegram-bot==20.3" >> requirements.txt
+yt-dlp
+python-telegram-bot==20.3
 
 # Upload to GitHub
 git add .
