@@ -1,14 +1,19 @@
+import os
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-BOT_TOKEN = ""  # 🔹 Replace this
+# 🔹 Load token securely from environment variable
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN not found! Please set it in Render environment variables.")
 
 # Convert bytes to readable sizes
 def readable_size(size):
     if not size or size <= 0:
         return "?"
-    for unit in ['B','KB','MB','GB']:
+    for unit in ['B', 'KB', 'MB', 'GB']:
         if size < 1024.0:
             return f"{size:.1f} {unit}"
         size /= 1024.0
@@ -41,7 +46,7 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data['video_info'] = info
         await update.message.reply_text(
-            f"🎬 *{info.get('title')}*\n\nSelect quality to download:",
+            f"🎬 *{info.get('title', 'Unknown Title')}*\n\nSelect quality to download:",
             reply_markup=InlineKeyboardMarkup(buttons),
             parse_mode="Markdown"
         )
