@@ -154,4 +154,5 @@ application.add_handler(CallbackQueryHandler(download_callback))
 # Run the bot (polling mode)
 # ----------------------------------------------------------------------------- 
 if __name__ == "__main__":
-    application.run_polling()
+    import uvicorn
+    uvicorn.run("bot:app_fastapi", host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
