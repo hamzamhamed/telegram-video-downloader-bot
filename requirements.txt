@@ -1,7 +1,6 @@
 
 
-# Copy your bot.py file here
-cp /path/to/your/bot.py .
+
 
 # Create a requirements.txt file
 echo "yt-dlp" >> requirements.txt
