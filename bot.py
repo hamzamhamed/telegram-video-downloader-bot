@@ -1,33 +1,42 @@
 import os
 import re
 import yt_dlp
+import logging
+from fastapi import FastAPI, Request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     MessageHandler,
-    filters,
-    ContextTypes,
     CallbackQueryHandler,
+    ContextTypes,
+    filters,
 )
+from telegram.request import HTTPXRequest
 
-# 🔹 Load token securely from environment variable
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN not found! Please set it in Render environment variables.")
+    raise ValueError("❌ BOT_TOKEN not found! Set it in Render environment variables.")
 
-# 🔹 Safe filename generator (to prevent “File name too long” errors)
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # e.g. https://your-service-name.onrender.com/webhook
+if not WEBHOOK_URL:
+    raise ValueError("❌ WEBHOOK_URL not found! Set it in Render environment variables.")
+
+PORT = int(os.environ.get("PORT", "10000"))
+
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
 def safe_filename(title: str) -> str:
     if not title:
         return "video"
-    # Remove emojis, symbols, etc.
     title = re.sub(r"[^\w\s-]", "", title)
-    # Replace spaces with underscores and truncate to 50 chars
     return title.strip().replace(" ", "_")[:50]
 
 
-# 🔹 Convert bytes to readable sizes
 def readable_size(size):
     if not size or size <= 0:
         return "?"
@@ -37,13 +46,23 @@ def readable_size(size):
         size /= 1024.0
     return f"{size:.1f} TB"
 
+# -----------------------------------------------------------------------------
+# Telegram bot logic
+# -----------------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+app_fastapi = FastAPI()
+request = HTTPXRequest(connection_pool_size=20)
+application = Application.builder().token(BOT_TOKEN).request(request).build()
 
-# 🔹 /start command
+@app_fastapi.on_event("startup")
+async def on_startup():
+    # Set Telegram webhook to point to Render URL
+    await application.bot.set_webhook(url=WEBHOOK_URL)
+    logging.info(f"🌐 Webhook set to: {WEBHOOK_URL}")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📥 Send me a video URL (Facebook, Instagram, YouTube, etc.) to download.")
+    await update.message.reply_text("📥 Send me a video URL to download.")
 
-
-# 🔹 Handle URLs sent by user
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     await update.message.reply_text("⏳ Fetching video details...")
@@ -68,7 +87,6 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ No downloadable formats found.")
             return
 
-        # Show last few formats (usually best quality)
         buttons = []
         for f in formats[-4:]:
             size = f.get("filesize") or f.get("filesize_approx") or 0
@@ -87,8 +105,6 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Error fetching video info:\n`{str(e)}`", parse_mode="Markdown")
 
-
-# 🔹 Handle quality button clicks (download phase)
 async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -96,7 +112,7 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = context.user_data.get("video_info")
 
     if not info:
-        await query.message.reply_text("⚠️ Session expired. Please send the video link again.")
+        await query.message.reply_text("⚠️ Session expired. Please send the link again.")
         return
 
     url = info["webpage_url"]
@@ -116,11 +132,9 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = ydl.extract_info(url, download=True)
             file_path = ydl.prepare_filename(result)
 
-        # Send video to user
         with open(file_path, "rb") as f:
             await query.message.reply_video(video=f, caption=f"✅ Downloaded: {title}")
 
-        # Optional cleanup
         try:
             os.remove(file_path)
         except Exception:
@@ -129,18 +143,24 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await query.message.reply_text(f"❌ Download failed:\n`{str(e)}`", parse_mode="Markdown")
 
+# Add handlers
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
+application.add_handler(CallbackQueryHandler(download_callback))
 
-# 🔹 Main entry
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+# -----------------------------------------------------------------------------
+# FastAPI endpoint for Telegram webhook
+# -----------------------------------------------------------------------------
+@app_fastapi.post("/webhook")
+async def telegram_webhook(req: Request):
+    data = await req.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return {"ok": True}
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
-    app.add_handler(CallbackQueryHandler(download_callback))
-
-    print("🤖 Bot is running (polling mode)...")
-    app.run_polling()
-
-
+# -----------------------------------------------------------------------------
+# Run with uvicorn
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    uvicorn.run("bot_webhook:app_fastapi", host="0.0.0.0", port=PORT)
