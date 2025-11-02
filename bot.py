@@ -163,4 +163,4 @@ async def telegram_webhook(req: Request):
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("bot_webhook:app_fastapi", host="0.0.0.0", port=PORT)
+    application.run_polling()
