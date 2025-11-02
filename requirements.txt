@@ -6,7 +6,4 @@
 yt-dlp
 python-telegram-bot==20.3
 
-# Upload to GitHub
-git add .
-git commit -m "Initial commit"
-git push
+
