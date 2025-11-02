@@ -1,9 +1,5 @@
-
-
-
-
-# Create a requirements.txt file
-yt-dlp
 python-telegram-bot==20.3
-
-
+yt-dlp
+fastapi
+uvicorn
+httpx
