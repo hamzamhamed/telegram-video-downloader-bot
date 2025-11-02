@@ -1,5 +1,4 @@
-git clone https://github.com/hamzamhamed/telegram-video-downloader-bot.git
-cd telegram-video-downloader-bot
+
 
 # Copy your bot.py file here
 cp /path/to/your/bot.py .
