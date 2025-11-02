@@ -1,0 +1,14 @@
+git clone https://github.com/YOUR_USERNAME/telegram-video-downloader-bot.git
+cd telegram-video-downloader-bot
+
+# Copy your bot.py file here
+cp /path/to/your/bot.py .
+
+# Create a requirements.txt file
+echo "yt-dlp" >> requirements.txt
+echo "python-telegram-bot==20.3" >> requirements.txt
+
+# Upload to GitHub
+git add .
+git commit -m "Initial commit"
+git push
