@@ -2,7 +2,7 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-BOT_TOKEN = "8536561007:AAGg_YE7TANydFEwszji4IoWZgDGER5Pv_8"  # 🔹 Replace this
+BOT_TOKEN = ""  # 🔹 Replace this
 
 # Convert bytes to readable sizes
 def readable_size(size):
