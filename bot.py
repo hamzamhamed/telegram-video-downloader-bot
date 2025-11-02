@@ -63,11 +63,14 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     await update.message.reply_text("⏳ Fetching video details...")
 
+    
     ydl_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "cookiefile": "cookies.txt" if os.path.exists("cookies.txt") else None,
-    }
+    "format": format_id,
+    "outtmpl": f"{safe_title}.%(ext)s",
+    "quiet": True,
+    "cookiefile": "cookies.txt" if os.path.exists("cookies.txt") else None,  # ✅ Here
+}
+
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
