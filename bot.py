@@ -26,7 +26,9 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     await update.message.reply_text("⏳ Fetching video details...")
 
-    ydl_opts = {"quiet": True, "skip_download": True}
+    # ✅ Added cookies.txt usage here
+    ydl_opts = {"quiet": True, "skip_download": True, "cookiefile": "cookies.txt"}
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -64,10 +66,12 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title = info.get('title', 'video')
     await query.edit_message_text(f"⬇️ Downloading *{title}* ...", parse_mode="Markdown")
 
+    # ✅ Added cookies.txt usage here too
     ydl_opts = {
         "format": format_id,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
+        "cookiefile": "cookies.txt",
     }
 
     try:
