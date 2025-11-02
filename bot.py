@@ -20,10 +20,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN not found! Set it in Render environment variables.")
 
-# Optional: Base URL for webhook if you ever switch to webhook mode
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-PORT = int(os.environ.get("PORT", "10000"))
+PORT = int(os.environ.get("PORT", 10000))
 
 # Optional: YouTube cookies stored as environment variable
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES")
@@ -57,20 +54,16 @@ request = HTTPXRequest(connection_pool_size=20)
 application = Application.builder().token(BOT_TOKEN).request(request).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📥 Send me a video URL to download.")
+    await update.message.reply_text("📥 Send me a YouTube video URL to download.")
 
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     await update.message.reply_text("⏳ Fetching video details...")
 
-    
     ydl_opts = {
-    "format": format_id,
-    "outtmpl": f"{safe_title}.%(ext)s",
-    "quiet": True,
-    "cookiefile": "cookies.txt" if os.path.exists("cookies.txt") else None,  # ✅ Here
-}
-
+        "quiet": True,
+        "cookiefile": "cookies.txt" if os.path.exists("cookies.txt") else None,
+    }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -87,7 +80,7 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         buttons = []
-        for f in formats[-4:]:
+        for f in formats[-4:]:  # Last 4 formats (highest quality)
             size = f.get("filesize") or f.get("filesize_approx") or 0
             size_str = readable_size(size)
             q = f.get("format_note") or f.get("height", "Unknown")
@@ -103,7 +96,9 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         if "Sign in to confirm" in str(e):
-            await update.message.reply_text("⚠️ YouTube requires login for this video. Please set your cookies in the bot.")
+            await update.message.reply_text(
+                "⚠️ YouTube requires login for this video. Please set your cookies in the bot."
+            )
         else:
             await update.message.reply_text(f"❌ Error fetching video info:\n`{str(e)}`", parse_mode="Markdown")
 
@@ -144,7 +139,9 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         if "Sign in to confirm" in str(e):
-            await query.message.reply_text("⚠️ YouTube requires login for this video. Please set your cookies.")
+            await query.message.reply_text(
+                "⚠️ YouTube requires login for this video. Please set your cookies."
+            )
         else:
             await query.message.reply_text(f"❌ Download failed:\n`{str(e)}`", parse_mode="Markdown")
 
@@ -157,5 +154,6 @@ application.add_handler(CallbackQueryHandler(download_callback))
 # Run the bot (polling mode)
 # ----------------------------------------------------------------------------- 
 if __name__ == "__main__":
+    import asyncio
+    print("🤖 Bot is starting...")
     application.run_polling()
-
