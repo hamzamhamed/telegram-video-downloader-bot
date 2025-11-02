@@ -2,7 +2,6 @@ import os
 import re
 import yt_dlp
 import logging
-from fastapi import FastAPI, Request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -14,28 +13,32 @@ from telegram.ext import (
 )
 from telegram.request import HTTPXRequest
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # Configuration
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN not found! Set it in Render environment variables.")
 
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # e.g. https://your-service-name.onrender.com/webhook
-if not WEBHOOK_URL:
-    raise ValueError("❌ WEBHOOK_URL not found! Set it in Render environment variables.")
+# Optional: Base URL for webhook if you ever switch to webhook mode
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 PORT = int(os.environ.get("PORT", "10000"))
 
-# -----------------------------------------------------------------------------
+# Optional: YouTube cookies stored as environment variable
+YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES")
+if YOUTUBE_COOKIES:
+    with open("cookies.txt", "w") as f:
+        f.write(YOUTUBE_COOKIES)
+
+# ----------------------------------------------------------------------------- 
 # Helpers
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 def safe_filename(title: str) -> str:
     if not title:
         return "video"
     title = re.sub(r"[^\w\s-]", "", title)
     return title.strip().replace(" ", "_")[:50]
-
 
 def readable_size(size):
     if not size or size <= 0:
@@ -46,19 +49,12 @@ def readable_size(size):
         size /= 1024.0
     return f"{size:.1f} TB"
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # Telegram bot logic
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 logging.basicConfig(level=logging.INFO)
-app_fastapi = FastAPI()
 request = HTTPXRequest(connection_pool_size=20)
 application = Application.builder().token(BOT_TOKEN).request(request).build()
-
-@app_fastapi.on_event("startup")
-async def on_startup():
-    # Set Telegram webhook to point to Render URL
-    await application.bot.set_webhook(url=WEBHOOK_URL)
-    logging.info(f"🌐 Webhook set to: {WEBHOOK_URL}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📥 Send me a video URL to download.")
@@ -103,7 +99,10 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error fetching video info:\n`{str(e)}`", parse_mode="Markdown")
+        if "Sign in to confirm" in str(e):
+            await update.message.reply_text("⚠️ YouTube requires login for this video. Please set your cookies in the bot.")
+        else:
+            await update.message.reply_text(f"❌ Error fetching video info:\n`{str(e)}`", parse_mode="Markdown")
 
 async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -141,26 +140,18 @@ async def download_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
     except Exception as e:
-        await query.message.reply_text(f"❌ Download failed:\n`{str(e)}`", parse_mode="Markdown")
+        if "Sign in to confirm" in str(e):
+            await query.message.reply_text("⚠️ YouTube requires login for this video. Please set your cookies.")
+        else:
+            await query.message.reply_text(f"❌ Download failed:\n`{str(e)}`", parse_mode="Markdown")
 
 # Add handlers
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
 application.add_handler(CallbackQueryHandler(download_callback))
 
-# -----------------------------------------------------------------------------
-# FastAPI endpoint for Telegram webhook
-# -----------------------------------------------------------------------------
-@app_fastapi.post("/webhook")
-async def telegram_webhook(req: Request):
-    data = await req.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
-    return {"ok": True}
-
-# -----------------------------------------------------------------------------
-# Run with uvicorn
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
+# Run the bot (polling mode)
+# ----------------------------------------------------------------------------- 
 if __name__ == "__main__":
-    import uvicorn
     application.run_polling()
